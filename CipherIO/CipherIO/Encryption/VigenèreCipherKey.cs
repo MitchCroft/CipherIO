@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: VigenèreCipherKey                                            //////////
 //////////  Created: 10/02/2019                                                //////////
-//////////  Modified: 12/02/2019                                               //////////
+//////////  Modified: 17/02/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Manage a collection of byte data that is used to provide           //////////
@@ -60,6 +60,16 @@ namespace CipherIO.Encryption {
         //PUBLIC
 
         /// <summary>
+        /// Get and set the current progress through the encryption key
+        /// </summary>
+        public uint Progress {
+            get { return progress; }
+            set { progress = value % (uint)encryptionKey.Length; }
+        }
+
+        //PUBLIC
+
+        /// <summary>
         /// The phrase that will be used to encrypt/decrypt data with this key
         /// </summary>
         /// <param name="phrase">A Unicode line of text that will be used to encrypt/decrypt the supplied data</param>
@@ -98,9 +108,10 @@ namespace CipherIO.Encryption {
         /// Modify the supplied data values in the forward direction 
         /// </summary>
         /// <param name="data">The data that is to be modified by the operation</param>
-        public void Encrypt(ref byte[] data) {
+        /// <param name="count">The number of bytes to be processed, measured from the start of the buffer</param>
+        public void Encrypt(ref byte[] data, int count) {
             //Loop through the byte data and apply the offset values
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < count; i++)
                 data[i] += Next(); 
         }
 
@@ -108,9 +119,10 @@ namespace CipherIO.Encryption {
         /// Modify the supplied data values in the reverse direction
         /// </summary>
         /// <param name="data">The data that is to be modified by the operation</param>
-        public void Decrypt(ref byte[] data) {
+        /// <param name="count">The number of bytes to be processed, measured from the start of the buffer</param>
+        public void Decrypt(ref byte[] data, int count) {
             //Loop through the byte data and apply the offset values
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < count; i++)
                 data[i] -= Next();
         }
     }

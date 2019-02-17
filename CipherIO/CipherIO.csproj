@@ -7,8 +7,8 @@
     <ProjectGuid>{5666AF6D-F62C-4061-A78D-297DAB545451}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>VigenèreCipherIO</RootNamespace>
-    <AssemblyName>VigenèreCipherIO</AssemblyName>
+    <RootNamespace>CipherIO</RootNamespace>
+    <AssemblyName>CipherIO</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -43,6 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CipherIO\Async\AsyncMonitor.cs" />
+    <Compile Include="CipherIO\Async\LogQueue.cs" />
+    <Compile Include="CipherIO\IO\AIOOperation.cs" />
+    <Compile Include="CipherIO\IO\DecryptFilesOperation.cs" />
+    <Compile Include="CipherIO\IO\EncryptFilesOperation.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="CipherIO\Attributes\ACallableAttribute.cs" />
