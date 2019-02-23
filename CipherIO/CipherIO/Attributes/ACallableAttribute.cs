@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: ACallableAttribute                                           //////////
 //////////  Created: 10/02/2019                                                //////////
-//////////  Modified: 10/02/2019                                               //////////
+//////////  Modified: 23/02/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Provide a base point for string-accessible operations to be        //////////
@@ -43,6 +43,11 @@ namespace CipherIO.Attributes {
         /// </summary>
         public string Example { get; private set; }
 
+        /// <summary>
+        /// The name of an additional function on the supplying object that will be used to process the parsed values
+        /// </summary>
+        public string OnProcessParsed { get; private set; }
+
         /*----------Functions----------*/
         //PUBLIC
 
@@ -52,10 +57,12 @@ namespace CipherIO.Attributes {
         /// <param name="identifier">The identifer that will be used represent the object. NOTE: This should be unique for all values</param>
         /// <param name="description">The description to provide in association with the attached element</param>
         /// <param name="example">An example of how to use the associated element</param>
-        public ACallableAttribute(string identifier, string description, string example) {
+        /// <param name="onProcess">Optional additional function name that can be used to process the parsed values</param>
+        public ACallableAttribute(string identifier, string description, string example, string onProcess) {
             Identifier = identifier;
             Desciption = description;
             Example = example;
+            OnProcessParsed = onProcess;
         }
 
         /// <summary>

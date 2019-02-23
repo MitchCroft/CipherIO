@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: AIOOperation                                                 //////////
 //////////  Created: 16/02/2019                                                //////////
-//////////  Modified: 16/02/2019                                               //////////
+//////////  Modified: 23/02/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Provide a base point for Cipher IO operations to inherit from for  //////////
@@ -64,6 +64,16 @@ namespace CipherIO.IO {
         /// </summary>
         public bool IncludeSubDirectories { get; private set; }
 
+        /// <summary>
+        /// Identifies the types of files should be included in the identification process when scanning a directory
+        /// </summary>
+        public string FilterExtensions { get; private set; }
+
+        /// <summary>
+        /// Retrieve the number of files that have been identified at the target path
+        /// </summary>
+        public int FileCount { get { return identifiedFiles.Count; } }
+
         /*----------Functions----------*/
         //PUBLIC
 
@@ -74,12 +84,14 @@ namespace CipherIO.IO {
         /// <param name="target">The target filepath for the operation</param>
         /// <param name="destination">The destination point to output the result of the operation</param>
         /// <param name="includeSub">Flags if sub-directory objects should be included in the operation</param>
-        public AIOOperation(string key, string target, string destination, bool includeSub) {
+        /// <param name="filterExtensions">Identifies the types of files to extract from directories for an operation</param>
+        public AIOOperation(string key, string target, string destination, bool includeSub, string filterExtensions) {
             //Stash the values for the operation
             Key = key;
             TargetPath = target;
             DestinationPath = destination;
             IncludeSubDirectories = includeSub;
+            FilterExtensions = filterExtensions;
         }
 
         /// <summary>
@@ -99,7 +111,7 @@ namespace CipherIO.IO {
             try {
                 //Check if the target path is a directory
                 if ((File.GetAttributes(TargetPath) & FileAttributes.Directory) != 0)
-                    identifiedFiles.AddRange(new DirectoryInfo(TargetPath).GetFiles("*.*", IncludeSubDirectories ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly));
+                    identifiedFiles.AddRange(new DirectoryInfo(TargetPath).GetFiles(FilterExtensions, IncludeSubDirectories ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly));
 
                 //Otherwise, use the supplied path
                 else identifiedFiles.Add(new FileInfo(TargetPath));

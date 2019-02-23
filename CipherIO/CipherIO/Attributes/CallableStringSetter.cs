@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: CallableStringSetter                                         //////////
 //////////  Created: 10/02/2019                                                //////////
-//////////  Modified: 10/02/2019                                               //////////
+//////////  Modified: 23/02/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Handle the assigning of a text value to the member object when     //////////
@@ -33,8 +33,9 @@ namespace CipherIO.Attributes {
         /// <param name="identifier">The identifer that will be used represent the object. NOTE: This should be unique for all values</param>
         /// <param name="description">The description to provide in association with the attached element</param>
         /// <param name="example">An example of how to use the associated element</param>
-        public CallableStringSetter(string identifier, string description, string example) : 
-            base(identifier, description, example) 
+        /// <param name="onProcess">Optional additional function name that can be used to process supplied values</param>
+        public CallableStringSetter(string identifier, string description, string example, string onProcess = null) : 
+            base(identifier, description, example, onProcess) 
         {}
 
         /// <summary>
@@ -52,6 +53,27 @@ namespace CipherIO.Attributes {
             if (field == null && prop == null) {
                 Console.WriteLine($"CallableStringSetter '{Identifier}' was unable to process the Member Info '{info.Name}' for the object '{obj}' as it was expecting it to be a field or property");
                 return;
+            }
+
+            //Check if there is an additional processing function to call
+            if (!string.IsNullOrEmpty(OnProcessParsed)) {
+                //Try to get the function from the calling object
+                MethodInfo parseFunc = obj.GetType().GetMethod(OnProcessParsed, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+
+                //If there was something found, see if it can be used
+                if (parseFunc != null) {
+                    //Check that the parameters are correct
+                    ParameterInfo[] parameters = parseFunc.GetParameters();
+
+                    //There needs to be a single parameter
+                    if (parameters.Length == 1) {
+                        //Parameter needs to be the correct type
+                        if (parameters[0].ParameterType == typeof(string)) {
+                            //Process the supplied method
+                            additional = (string)parseFunc.Invoke(obj, new object[] { additional });
+                        }
+                    }
+                }
             }
 
             //If the value is just a field, assign the value

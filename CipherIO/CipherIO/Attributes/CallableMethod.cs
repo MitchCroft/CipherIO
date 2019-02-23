@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: CallableMethod                                               //////////
 //////////  Created: 10/02/2019                                                //////////
-//////////  Modified: 10/02/2019                                               //////////
+//////////  Modified: 23/02/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Allow for the running of a method based on the stored string       //////////
@@ -34,7 +34,7 @@ namespace CipherIO.Attributes {
         /// <param name="description">The description to provide in association with the attached element</param>
         /// <param name="example">An example of how to use the associated element</param>
         public CallableMethod(string identifier, string description, string example) : 
-            base(identifier, description, example) 
+            base(identifier, description, example, null) 
         {}
 
         /// <summary>
@@ -71,7 +71,7 @@ namespace CipherIO.Attributes {
 
             //Store the parameters to supply
             object[] parms = (parameters.Length == 0 ?
-                new object[0] :
+                null :
                 new object[] { additional }
             );
 

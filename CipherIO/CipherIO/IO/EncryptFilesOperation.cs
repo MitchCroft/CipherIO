@@ -37,8 +37,9 @@ namespace CipherIO.IO {
         /// <param name="target">The target filepath for the operation</param>
         /// <param name="destination">The destination point to output the result of the operation</param>
         /// <param name="includeSub">Flags if sub-directory objects should be included in the operation</param>
-        public EncryptFilesOperation(string key, string target, string destination, bool includeSub) : 
-            base(key, target, destination, includeSub) 
+        /// <param name="filterExtensions">Identifies the types of files to extract from directories for an operation</param>
+        public EncryptFilesOperation(string key, string target, string destination, bool includeSub, string filterExtensions) : 
+            base(key, target, destination, includeSub, filterExtensions) 
         {}
 
         /// <summary>
@@ -95,7 +96,7 @@ namespace CipherIO.IO {
                 //Process all of the identified files
                 foreach (FileInfo file in identifiedFiles) {
                     //Remove the root directory from the filepath
-                    string relativePath = file.FullName.Substring(rootDir.Length + 1);
+                    string relativePath = file.FullName.Substring(rootDir.Length);
 
                     //Get the number of characters in the 
                     intBuffer = BitConverter.GetBytes(relativePath.Length);

@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: DecryptFilesOperation                                        //////////
 //////////  Created: 17/02/2019                                                //////////
-//////////  Modified: 17/02/2019                                               //////////
+//////////  Modified: 23/02/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Manage the decryption of the identified file by the initial        //////////
@@ -39,8 +39,9 @@ namespace CipherIO.IO {
         /// <param name="target">The target filepath for the operation</param>
         /// <param name="destination">The destination point to output the result of the operation</param>
         /// <param name="includeSub">Flags if sub-directory objects should be included in the operation</param>
-        public DecryptFilesOperation(string key, string target, string destination, bool includeSub) : 
-            base(key, target, destination, includeSub) 
+        /// <param name="filterExtensions">Identifies the types of files to extract from directories for an operation</param>
+        public DecryptFilesOperation(string key, string target, string destination, bool includeSub, string filterExtensions) : 
+            base(key, target, destination, includeSub, filterExtensions) 
         {}
 
         /// <summary>
@@ -97,7 +98,7 @@ namespace CipherIO.IO {
                     //Get the size of the relative filepath that is to be read
                     await reader.ReadAsync(intBuffer, 0, sizeof(int));
                     key.Decrypt(ref intBuffer, sizeof(int));
-
+                    
                     //Store the number of characters to be read
                     int pathCharacters = BitConverter.ToInt32(intBuffer, 0);
 
@@ -108,13 +109,16 @@ namespace CipherIO.IO {
                     long processedCount = 0;
                     do {
                         //Retrieve the next chunk of characters
-                        int readCount = await reader.ReadAsync(dataBuffer, 0, Math.Min(BUFFER_SIZE, pathCharacters * sizeof(char)));
+                        int readCount = await reader.ReadAsync(dataBuffer, 0, Math.Min(BUFFER_SIZE / sizeof(char) * sizeof(char), (pathCharacters - (int)processedCount) * sizeof(char)));
                         
                         //Decrypt the received characters
                         key.Decrypt(ref dataBuffer, readCount);
 
+                        //Half the read count for the number of characters to process
+                        readCount /= sizeof(char);
+
                         //Extract the characters from the buffer
-                        for (int c = 0; c < readCount / 2; c++)
+                        for (int c = 0; c < readCount; c++)
                             filepath.Append(BitConverter.ToChar(dataBuffer, (int)processedCount + sizeof(char) * c));
 
                         //Increase the counters
@@ -131,22 +135,26 @@ namespace CipherIO.IO {
                     //Get a temp file to store the data at
                     string tempPath = Path.GetTempFileName();
 
+                    //Add the entry to the monitor list
+                    generatedFiles.Add(new Tuple<string, string>(
+                        tempPath,
+                        Path.Combine(DestinationPath, filepath.ToString())
+                    ));
+
                     //Try to create and process the contained file
                     try {
                         //Create the file to be processed
                         writer = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, BUFFER_SIZE);
-
-                        //Add the entry to the monitor list
-                        generatedFiles.Add(new Tuple<string, string>(
-                            tempPath,
-                            Path.Combine(DestinationPath, filepath.ToString())
-                        ));
 
                         //Process all of the data within the file
                         processedCount = 0;
                         do {
                             //Retrieve the chunk of data
                             int readCount = await reader.ReadAsync(dataBuffer, 0, (int)Math.Min(BUFFER_SIZE, dataCount - processedCount));
+
+                            //If there is a lot of data to read and nothing was read out, then there is a problem
+                            if (readCount == 0 && dataCount - processedCount > 0)
+                                throw new OperationCanceledException($"OperationCanceledException: {dataCount - processedCount} bytes are left to be read but 0 bytes were read. Reached EOF");
 
                             //Increase the counters
                             processedCount += readCount;
@@ -157,12 +165,21 @@ namespace CipherIO.IO {
                         } while (processedCount < dataCount);
                     }
 
-                    //Log any exceptions that occur
+#if DEBUG
+                    //Log the exception thrown for debugging purposes
+                    catch (Exception exec) {
+                        logger.Log($"Decryption failed to process internal file. Writing of included file '{filepath.ToString()}' failed. ERROR: {exec.Message}");
+                        successful = false;
+                        break;
+                    }
+#else
+                    //Log general failure on exception. Assume key is wrong
                     catch {
                         logger.Log("Decryption failed to process an internal file. Is the Cipher Key correct?");
                         successful = false;
                         break;
                     }
+#endif
 
                     //Cleanup the file writing
                     finally {
@@ -177,12 +194,20 @@ namespace CipherIO.IO {
                 }
             }
 
-            //Catch anything unexpected that happens
+#if DEBUG
+            //Log the exception thrown for debugging purposes
+            catch (Exception exec) {
+                logger.Log($"Decryption failed to process internal file. Is the Cipher Key correct? ERROR: {exec.Message}");
+                successful = false;
+            }
+#else
+            //Log general failure on exception. Assume key is wrong
             catch {
                 logger.Log("Decryption failed to process an internal file. Is the Cipher Key correct?");
                 successful = false;
-            } 
-            
+            }
+#endif
+
             finally {
                 //Clear out the file streams
                 if (writer != null) { writer.Dispose(); writer = null; }

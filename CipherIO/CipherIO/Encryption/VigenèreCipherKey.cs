@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: VigenèreCipherKey                                            //////////
 //////////  Created: 10/02/2019                                                //////////
-//////////  Modified: 17/02/2019                                               //////////
+//////////  Modified: 23/02/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Manage a collection of byte data that is used to provide           //////////
@@ -48,10 +48,7 @@ namespace CipherIO.Encryption {
             if (encryptionKey.Length == 0) return 0;
 
             //Use the next byte value
-            byte val = encryptionKey[progress];
-
-            //Progress the progress to the next value
-            progress = (progress + 1) % (uint)encryptionKey.Length;
+            byte val = encryptionKey[Progress++];
 
             //Return the value
             return val;
@@ -110,9 +107,11 @@ namespace CipherIO.Encryption {
         /// <param name="data">The data that is to be modified by the operation</param>
         /// <param name="count">The number of bytes to be processed, measured from the start of the buffer</param>
         public void Encrypt(ref byte[] data, int count) {
-            //Loop through the byte data and apply the offset values
-            for (int i = 0; i < count; i++)
-                data[i] += Next(); 
+            unchecked {
+                //Loop through the byte data and apply the offset values
+                for (int i = 0; i < count; i++)
+                    data[i] += Next();
+            }
         }
 
         /// <summary>
@@ -121,9 +120,11 @@ namespace CipherIO.Encryption {
         /// <param name="data">The data that is to be modified by the operation</param>
         /// <param name="count">The number of bytes to be processed, measured from the start of the buffer</param>
         public void Decrypt(ref byte[] data, int count) {
-            //Loop through the byte data and apply the offset values
-            for (int i = 0; i < count; i++)
-                data[i] -= Next();
+            unchecked {
+                //Loop through the byte data and apply the offset values
+                for (int i = 0; i < count; i++)
+                    data[i] -= Next();
+            }
         }
     }
 }

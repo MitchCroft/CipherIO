@@ -33,8 +33,9 @@ namespace CipherIO.Attributes {
         /// <param name="identifier">The identifer that will be used represent the object. NOTE: This should be unique for all values</param>
         /// <param name="description">The description to provide in association with the attached element</param>
         /// <param name="example">An example of how to use the associated element</param>
-        public CallableBoolSetter(string identifier, string description, string example) : 
-            base(identifier, description, example) 
+        /// <param name="onProcess">Optional additional function name that can be used to process the parsed values</param>
+        public CallableBoolSetter(string identifier, string description, string example, string onProcess = null) : 
+            base(identifier, description, example, onProcess) 
         {}
 
         /// <summary>
@@ -59,6 +60,27 @@ namespace CipherIO.Attributes {
             if (!bool.TryParse(additional, out val)) {
                 Console.WriteLine($"CallableBoolSetter '{Identifier}' was unable to parse the text '{additional}' to a boolean value (true/false). Unable to assign value");
                 return;
+            }
+
+            //Check if there is an additional processing function to call
+            if (!string.IsNullOrEmpty(OnProcessParsed)) {
+                //Try to get the function from the calling object
+                MethodInfo parseFunc = obj.GetType().GetMethod(OnProcessParsed, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+
+                //If there was something found, see if it can be used
+                if (parseFunc != null) {
+                    //Check that the parameters are correct
+                    ParameterInfo[] parameters = parseFunc.GetParameters();
+
+                    //There needs to be a single parameter
+                    if (parameters.Length == 1) {
+                        //Parameter needs to be the correct type
+                        if (parameters[0].ParameterType == typeof(bool)) {
+                            //Process the supplied method
+                            val = (bool)parseFunc.Invoke(obj, new object[] { val });
+                        }
+                    }
+                }
             }
 
             //If the value is just a field, assign the value
