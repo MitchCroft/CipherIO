@@ -19,8 +19,6 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 
-using CipherIO.Async;
-
 namespace CipherIO.IO {
     /// <summary>
     /// Base point for Cipher IO operations to inherit from for use
@@ -97,13 +95,8 @@ namespace CipherIO.IO {
         /// <summary>
         /// Populate the identified files list with the determined values
         /// </summary>
-        /// <param name="monitor">The monitor that will be updated with information during the operation</param>
-        /// <param name="logger">Used to output specific messages to throughout the operation execution</param>
         /// <returns>Returns true if there were files found for processing</returns>
-        public bool IdentifiyFiles(AsyncMonitor monitor, LogQueue logger) {
-            //Reset the monitoring progress
-            monitor.Progress = 0f;
-
+        public bool IdentifiyFiles() {
             //Create the list of files to be processed
             identifiedFiles = new List<FileInfo>();
 
@@ -119,7 +112,7 @@ namespace CipherIO.IO {
 
             //Log the error and progress
             catch (Exception exec) {
-                logger.Log($"Failed to identify files with the path '{TargetPath}'. ERROR: {exec.Message}");
+                Console.WriteLine($"Failed to identify files with the path '{TargetPath}'. ERROR: {exec.Message}");
                 return false;
             }
 
@@ -130,8 +123,7 @@ namespace CipherIO.IO {
         /// <summary>
         /// Provide the access point for the operation to occur
         /// </summary>
-        /// <param name="monitor">The monitor that will be updated with information during the operation</param>
-        /// <param name="logger">Used to output specific messages to throughout the operation execution</param>
-        public abstract void StartOperation(AsyncMonitor monitor, LogQueue logger);
+        /// <returns>Returns true of the operation was successful</returns>
+        public abstract bool StartOperation();
     }
 }

@@ -19,7 +19,6 @@ using System;
 using System.IO;
 using System.IO.Compression;
 
-using CipherIO.Async;
 using CipherIO.Encryption;
 
 namespace CipherIO.IO {
@@ -45,14 +44,12 @@ namespace CipherIO.IO {
         /// <summary>
         /// Handle the encryption of the identified filepaths to an output file
         /// </summary>
-        /// <param name="monitor">The monitor that will be updated with information during the operation</param>
-        /// <param name="logger">Used to output specific messages to throughout the operation execution</param>
-        public override async void StartOperation(AsyncMonitor monitor, LogQueue logger) {
+        /// <returns>Returns true of the operation was successful</returns>
+        public override bool StartOperation() {
             //Check that there are files to process
             if (identifiedFiles.Count == 0) {
-                logger.Log("Can't start encryption operation. No files were identified for encryption");
-                monitor.IsComplete = true;
-                return;
+                Console.WriteLine("Can't start encryption operation. No files were identified for encryption");
+                return false;
             }
 
             //Store the buffers that will be used for the operation
@@ -64,7 +61,10 @@ namespace CipherIO.IO {
             VigenèreCipherKey key = new VigenèreCipherKey(Key);
 
             //Flag if the operation was completed successfully
-            bool successful = true; 
+            bool successful = true;
+
+            //Store a progress value that can be output
+            float progress = 0f;
 
             //Attempt to parse all of the supplied data
             try {
@@ -83,6 +83,11 @@ namespace CipherIO.IO {
                     TargetPath
                 );
 
+                //Ensure that there is a trailing slash on the directory
+                if (!rootDir.EndsWith(Path.DirectorySeparatorChar.ToString()) ||
+                    !rootDir.EndsWith(Path.AltDirectorySeparatorChar.ToString()))
+                    rootDir += Path.DirectorySeparatorChar;
+
                 //Determine the percentage to use per file that is encrypted
                 float percentageUsage = 1f / identifiedFiles.Count;
 
@@ -92,7 +97,7 @@ namespace CipherIO.IO {
                 key.Encrypt(ref intBuffer, sizeof(int));
 
                 //Write the count to the file
-                await writer.WriteAsync(intBuffer, 0, sizeof(int));
+                writer.Write(intBuffer, 0, sizeof(int));
 
                 //Process each of the files that are to be included
                 foreach (FileInfo file in identifiedFiles) {
@@ -105,7 +110,7 @@ namespace CipherIO.IO {
                     key.Encrypt(ref intBuffer, sizeof(int));
 
                     //Write the character count to the file
-                    await writer.WriteAsync(intBuffer, 0, sizeof(int));
+                    writer.Write(intBuffer, 0, sizeof(int));
 
                     //Write the filepath to the buffer
                     long processedCount = 0;
@@ -125,7 +130,7 @@ namespace CipherIO.IO {
 
                         //Encrypt the buffer and write it to the file
                         key.Encrypt(ref dataBuffer, dataBufferUsage);
-                        await writer.WriteAsync(dataBuffer, 0, dataBufferUsage);
+                        writer.Write(dataBuffer, 0, dataBufferUsage);
                     } while (processedCount < relativePath.Length);
 
                     //Get the amount of data in the file
@@ -134,7 +139,7 @@ namespace CipherIO.IO {
                     key.Encrypt(ref longBuffer, sizeof(long));
 
                     //Write the data count to the buffer
-                    await writer.WriteAsync(longBuffer, 0, sizeof(long));
+                    writer.Write(longBuffer, 0, sizeof(long));
 
                     //Try to open and process the file that is being processed
                     try {
@@ -145,20 +150,20 @@ namespace CipherIO.IO {
                         processedCount = 0;
                         do {
                             //Retrieve the chunk of data from the file
-                            int readCount = await reader.ReadAsync(dataBuffer, 0, BUFFER_SIZE);
+                            int readCount = reader.Read(dataBuffer, 0, BUFFER_SIZE);
 
                             //Add to the counter
                             processedCount += readCount;
 
                             //Encrypt and write the data
                             key.Encrypt(ref dataBuffer, readCount);
-                            await writer.WriteAsync(dataBuffer, 0, readCount);
+                            writer.Write(dataBuffer, 0, readCount);
                         } while (processedCount < file.Length);
                     }
 
                     //Log any errors that occur
                     catch (Exception exec) {
-                        logger.Log($"Encryption failed to process the file '{file.FullName}'. ERROR: {exec.Message}");
+                        Console.WriteLine($"Encryption failed to process the file '{file.FullName}'. ERROR: {exec.Message}");
                         successful = false;
                         break;
                     }
@@ -167,13 +172,14 @@ namespace CipherIO.IO {
                     finally { if (reader != null) { reader.Dispose(); reader = null; } }
 
                     //Increment the operation percentage
-                    monitor.Progress += percentageUsage;
+                    progress += percentageUsage;
+                    Console.WriteLine($"\tProgress: {(progress * 100f).ToString("F2") + '%'}");
                 }
             }
 
             //Catch anything unexpected that happens
             catch (Exception exec) {
-                logger.Log($"Unexpected error occurred, unable to complete encryption operation. ERROR: {exec.Message}");
+                Console.WriteLine($"Unexpected error occurred, unable to complete encryption operation. ERROR: {exec.Message}");
                 successful = false;
             }
 
@@ -185,11 +191,10 @@ namespace CipherIO.IO {
 
                 //If the operation wasn't successful, delete the file if it exists
                 if (!successful) File.Delete(DestinationPath);
-
-                //Mark the end of the operation
-                monitor.Success = successful;
-                monitor.IsComplete = true;
             }
+
+            //Mark the end of the operation
+            return successful;
         }
     }
 }

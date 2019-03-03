@@ -64,8 +64,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CipherIO\Async\AsyncMonitor.cs" />
-    <Compile Include="CipherIO\Async\LogQueue.cs" />
     <Compile Include="CipherIO\IO\AIOOperation.cs" />
     <Compile Include="CipherIO\IO\DecryptFilesOperation.cs" />
     <Compile Include="CipherIO\IO\EncryptFilesOperation.cs" />

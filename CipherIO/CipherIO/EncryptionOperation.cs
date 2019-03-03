@@ -20,7 +20,6 @@ using System.IO;
 using System.Threading;
 
 using CipherIO.IO;
-using CipherIO.Async;
 using CipherIO.Attributes;
 
 namespace CipherIO {
@@ -58,15 +57,11 @@ namespace CipherIO {
         /// <param name="operation">The operation that is to be processed</param>
         /// <returns>Returns true if the operation was successful</returns>
         private bool MonitorOperation(AIOOperation operation) {
-            //Create the async objects for the operation progress
-            AsyncMonitor monitor = new AsyncMonitor();
-            LogQueue logger = new LogQueue();
-
             //Output log information
             Console.WriteLine($"Identifying Files at '{operation.TargetPath}'...");
 
             //Determine if the file identification was successful
-            if (!operation.IdentifiyFiles(monitor, logger)) {
+            if (!operation.IdentifiyFiles()) {
                 Console.WriteLine("Operation failed to identify any files for processing");
                 return false;
             }
@@ -75,34 +70,12 @@ namespace CipherIO {
             Console.WriteLine($"Found {operation.FileCount} files to process. Starting operation...");
 
             //Start the operation
-            operation.StartOperation(monitor, logger);
-
-            //Loop for the duration of the operation
-            float prev = 0f, current = 0f;
-            do {
-                //Sleep the current thread for a short period
-                Thread.Sleep(100);
-
-                //Get the next progress value
-                current = monitor.Progress;
-
-                //If the progress is different, log it
-                if (current > prev) {
-                    //Add the message to the queue
-                    logger.Log($"\tProgress: {(current * 100f).ToString("F2")}%");
-
-                    //Save the new value
-                    prev = current;
-                }
-
-                //Process all of the logger messages
-                while (logger.HasMessages) Console.WriteLine(logger.NextMessage);
-            } while (!monitor.IsComplete || logger.HasMessages);
+            bool success = operation.StartOperation();
 
             //Check if the original files should be removed by the operation
             if (removeOriginals) {
                 //If the operation was successful, try to remove the originals
-                if (monitor.Success) {
+                if (success) {
                     //Try to remove the file/directory 
                     try {
                         //Check to see if the supplied is a file or directory
@@ -122,7 +95,7 @@ namespace CipherIO {
             }
 
             //Return the success state of the operation
-            return monitor.Success;
+            return success;
         }
 
         //PUBLIC
