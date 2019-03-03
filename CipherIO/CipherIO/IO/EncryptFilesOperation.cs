@@ -6,7 +6,7 @@
 //////////                                                                     //////////
 //////////  Name: EncryptFilesOperation                                        //////////
 //////////  Created: 17/02/2019                                                //////////
-//////////  Modified: 17/02/2019                                               //////////
+//////////  Modified: 03/03/2019                                               //////////
 //////////                                                                     //////////
 //////////  Purpose:                                                           //////////
 //////////  Manage the encryption of the identified filepaths by the initial   //////////
@@ -86,86 +86,85 @@ namespace CipherIO.IO {
                 //Determine the percentage to use per file that is encrypted
                 float percentageUsage = 1f / identifiedFiles.Count;
 
-                //Get the number of files that will be included in the encryption
+                //Convert the number of files to process into bytes
                 intBuffer = BitConverter.GetBytes(identifiedFiles.Count);
+                if (BitConverter.IsLittleEndian) Array.Reverse(intBuffer, 0, sizeof(int));
                 key.Encrypt(ref intBuffer, sizeof(int));
 
-                //Write the count to the stream
+                //Write the count to the file
                 await writer.WriteAsync(intBuffer, 0, sizeof(int));
 
-                //Process all of the identified files
+                //Process each of the files that are to be included
                 foreach (FileInfo file in identifiedFiles) {
                     //Remove the root directory from the filepath
                     string relativePath = file.FullName.Substring(rootDir.Length);
 
-                    //Get the number of characters in the 
+                    //Get the number of characters to be processed in the relative path
                     intBuffer = BitConverter.GetBytes(relativePath.Length);
+                    if (BitConverter.IsLittleEndian) Array.Reverse(intBuffer, 0, sizeof(int));
                     key.Encrypt(ref intBuffer, sizeof(int));
 
-                    //Write the character count to the stream
+                    //Write the character count to the file
                     await writer.WriteAsync(intBuffer, 0, sizeof(int));
 
-                    //Write all of the relative path characters to the buffer
+                    //Write the filepath to the buffer
                     long processedCount = 0;
                     do {
-                        //Track the amount of the buffer that has been used
+                        //Track the number of characters that have been added to the buffer
                         int dataBufferUsage = 0;
 
-                        //Process as many remaining characters as possible
-                        for (; processedCount < relativePath.Length && dataBufferUsage + sizeof(char) < BUFFER_SIZE; processedCount++) {
-                            //Convert the next character
-                            Array.Copy(BitConverter.GetBytes(relativePath[(int)processedCount]), 0, dataBuffer, dataBufferUsage, sizeof(char));
+                        //Copy the available characters to the buffer
+                        for (; processedCount < relativePath.Length && dataBufferUsage + sizeof(char) < BUFFER_SIZE; processedCount++, dataBufferUsage += sizeof(char)) {
+                            //Get the bytes for the characters
+                            byte[] charBuffer = BitConverter.GetBytes(relativePath[(int)processedCount]);
 
-                            //Increment the buffer usage
-                            dataBufferUsage += sizeof(char);
+                            //Copy the characters to the buffer
+                            if (BitConverter.IsLittleEndian) Array.Reverse(charBuffer, 0, sizeof(char));
+                            Array.Copy(charBuffer, 0, dataBuffer, dataBufferUsage, sizeof(char));
                         }
 
-                        //Encrypt the buffer and write to file
+                        //Encrypt the buffer and write it to the file
                         key.Encrypt(ref dataBuffer, dataBufferUsage);
                         await writer.WriteAsync(dataBuffer, 0, dataBufferUsage);
                     } while (processedCount < relativePath.Length);
 
-                    //Get the size of the file to be processed
+                    //Get the amount of data in the file
                     longBuffer = BitConverter.GetBytes(file.Length);
+                    if (BitConverter.IsLittleEndian) Array.Reverse(longBuffer, 0, sizeof(long));
                     key.Encrypt(ref longBuffer, sizeof(long));
 
-                    //Write the file size to the stream
+                    //Write the data count to the buffer
                     await writer.WriteAsync(longBuffer, 0, sizeof(long));
 
-                    //Try to open and process the current file
+                    //Try to open and process the file that is being processed
                     try {
-                        //Create the file reader
-                        reader = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.None, BUFFER_SIZE);
+                        //Open the file for reading
+                        reader = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.Read, BUFFER_SIZE);
 
                         //Process all of the data in the file
                         processedCount = 0;
                         do {
-                            //Retrieve the next chunk of data
+                            //Retrieve the chunk of data from the file
                             int readCount = await reader.ReadAsync(dataBuffer, 0, BUFFER_SIZE);
 
-                            //Increase the counters
+                            //Add to the counter
                             processedCount += readCount;
 
-                            //Encrypt the buffer and write to file
+                            //Encrypt and write the data
                             key.Encrypt(ref dataBuffer, readCount);
                             await writer.WriteAsync(dataBuffer, 0, readCount);
                         } while (processedCount < file.Length);
                     }
 
-                    //Log any exceptions that occur
+                    //Log any errors that occur
                     catch (Exception exec) {
                         logger.Log($"Encryption failed to process the file '{file.FullName}'. ERROR: {exec.Message}");
                         successful = false;
                         break;
                     }
 
-                    //Cleanup the file reading
-                    finally {
-                        if (reader != null) {
-                            reader.Dispose();
-                            reader = null;
-                        }
-                    }
+                    //Cleanup the file elements
+                    finally { if (reader != null) { reader.Dispose(); reader = null; } }
 
                     //Increment the operation percentage
                     monitor.Progress += percentageUsage;

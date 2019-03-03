@@ -83,53 +83,68 @@ namespace CipherIO.IO {
                 byte[] intBuffer = new byte[sizeof(int)];
                 byte[] longBuffer = new byte[sizeof(long)];
 
-                //Get the number of files that were included in decryption
+                //Read the number of files that are included in this collection
                 await reader.ReadAsync(intBuffer, 0, sizeof(int));
                 key.Decrypt(ref intBuffer, sizeof(int));
 
-                //Store the number of files to be decrypted
+                //Decrypt the count
+                if (BitConverter.IsLittleEndian) Array.Reverse(intBuffer, 0, sizeof(int));
                 int fileCount = BitConverter.ToInt32(intBuffer, 0);
 
-                //Determine the percentage to use per file that is decrypted
+                //Calculate the percentage to use for each file processed
                 float percentageUsage = .75f / fileCount;
 
-                //Loop through all of the files included in the file
+                //Loop through each file to be processed
                 for (int i = 0; i < fileCount; i++) {
-                    //Get the size of the relative filepath that is to be read
+                    //Read the bytes for the number of characters in the filepath
                     await reader.ReadAsync(intBuffer, 0, sizeof(int));
                     key.Decrypt(ref intBuffer, sizeof(int));
-                    
-                    //Store the number of characters to be read
-                    int pathCharacters = BitConverter.ToInt32(intBuffer, 0);
 
-                    //Create a string buffer to read in the relative filepaths
-                    StringBuilder filepath = new StringBuilder(pathCharacters);
+                    //Get the number of characters that are in the 
+                    if (BitConverter.IsLittleEndian) Array.Reverse(intBuffer, 0, sizeof(int));
+                    int characterCount = BitConverter.ToInt32(intBuffer, 0);
 
-                    //Read all of the characters from the buffer
+                    //Construct the relative filepath back from the data
+                    StringBuilder relativePath = new StringBuilder(characterCount);
+
+                    //Loop through and read the filepath
                     long processedCount = 0;
                     do {
-                        //Retrieve the next chunk of characters
-                        int readCount = await reader.ReadAsync(dataBuffer, 0, Math.Min(BUFFER_SIZE / sizeof(char) * sizeof(char), (pathCharacters - (int)processedCount) * sizeof(char)));
-                        
-                        //Decrypt the received characters
+                        //Retrieve the next chunk of characters from datafile
+                        int readCount = await reader.ReadAsync(dataBuffer, 0, 
+                            Math.Min(
+                                (BUFFER_SIZE / sizeof(char)) * sizeof(char),
+                                (characterCount - (int)processedCount) * sizeof(char)
+                            )
+                        );
+
+                        //Decrypt the character bytes
                         key.Decrypt(ref dataBuffer, readCount);
 
-                        //Half the read count for the number of characters to process
+                        //Half the count for final processing
                         readCount /= sizeof(char);
 
                         //Extract the characters from the buffer
-                        for (int c = 0; c < readCount; c++)
-                            filepath.Append(BitConverter.ToChar(dataBuffer, (int)processedCount + sizeof(char) * c));
+                        byte[] charBuffer = new byte[sizeof(char)];
+                        for (int c = 0; c < readCount; c++) {
+                            //Get the character bytes from the array
+                            Array.Copy(dataBuffer, c * sizeof(char), charBuffer, 0, sizeof(char));
 
-                        //Increase the counters
+                            //Convert the byte data back to a character
+                            if (BitConverter.IsLittleEndian) Array.Reverse(charBuffer, 0, sizeof(char));
+                            relativePath.Append(BitConverter.ToChar(charBuffer, 0));
+                        }
+
+                        //Increase the counter
                         processedCount += readCount;
-                    } while (processedCount < pathCharacters);
+                    } while (processedCount < characterCount);
 
-                    //Get the amount of data that is to be processed for this file
+                    //Get the amount of data to evaluated by this process
                     await reader.ReadAsync(longBuffer, 0, sizeof(long));
                     key.Decrypt(ref longBuffer, sizeof(long));
 
                     //Get the amount of data to be processed
+                    if (BitConverter.IsLittleEndian) Array.Reverse(longBuffer, 0, sizeof(long));
                     long dataCount = BitConverter.ToInt64(longBuffer, 0);
 
                     //Get a temp file to store the data at
@@ -138,37 +153,41 @@ namespace CipherIO.IO {
                     //Add the entry to the monitor list
                     generatedFiles.Add(new Tuple<string, string>(
                         tempPath,
-                        Path.Combine(DestinationPath, filepath.ToString())
+                        Path.Combine(DestinationPath, relativePath.ToString())
                     ));
 
-                    //Try to create and process the contained file
+                    //Try to create process the contained file
                     try {
-                        //Create the file to be processed
-                        writer = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, BUFFER_SIZE);
+                        //Open the temporary file for writing
+                        writer = new FileStream(tempPath, FileMode.Append, FileAccess.Write, FileShare.Read, BUFFER_SIZE);
 
                         //Process all of the data within the file
                         processedCount = 0;
                         do {
-                            //Retrieve the chunk of data
-                            int readCount = await reader.ReadAsync(dataBuffer, 0, (int)Math.Min(BUFFER_SIZE, dataCount - processedCount));
+                            //Retrieve the next chunk of data to process
+                            int readCount = await reader.ReadAsync(dataBuffer, 0, 
+                                (int)Math.Min(
+                                    BUFFER_SIZE,
+                                    dataCount - processedCount
+                                )
+                            );
 
-                            //If there is a lot of data to read and nothing was read out, then there is a problem
+                            //If there is data to be read but nothing was read from the file, then something has gone wrong
                             if (readCount == 0 && dataCount - processedCount > 0)
                                 throw new OperationCanceledException($"OperationCanceledException: {dataCount - processedCount} bytes are left to be read but 0 bytes were read. Reached EOF");
 
                             //Increase the counters
                             processedCount += readCount;
 
-                            //Decrypt the buffer
+                            //Decrypt the buffer and write it to the file
                             key.Decrypt(ref dataBuffer, readCount);
                             await writer.WriteAsync(dataBuffer, 0, readCount);
                         } while (processedCount < dataCount);
                     }
-
 #if DEBUG
                     //Log the exception thrown for debugging purposes
                     catch (Exception exec) {
-                        logger.Log($"Decryption failed to process internal file. Writing of included file '{filepath.ToString()}' failed. ERROR: {exec.Message}");
+                        logger.Log($"Decryption failed to process internal file. Writing of included file '{relativePath.ToString()}' failed. ERROR: {exec.Message}");
                         successful = false;
                         break;
                     }
@@ -180,14 +199,8 @@ namespace CipherIO.IO {
                         break;
                     }
 #endif
-
                     //Cleanup the file writing
-                    finally {
-                        if (writer != null) {
-                            writer.Dispose();
-                            writer = null;
-                        }
-                    }
+                    finally { if (writer != null) { writer.Dispose(); writer = null; } }
 
                     //Increment the operation percentage
                     monitor.Progress += percentageUsage;
