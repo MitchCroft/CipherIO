@@ -161,6 +161,16 @@ namespace CipherIO {
         }
 
         /// <summary>
+        /// Swap the directories that are stored for both path values
+        /// </summary>
+        [CallableMethod("-swapPaths", "Swap the paths so that the destination becomes the target and the target the destination", "-swapPaths")]
+        public void SwapPaths() {
+            string buffer = targetPath;
+            targetPath = destinationPath;
+            destinationPath = buffer;
+        }
+
+        /// <summary>
         /// Clear the current console text from the screen
         /// </summary>
         [CallableMethod("-clear", "Clear the console screen of all currently entered text", "-clear")] 
